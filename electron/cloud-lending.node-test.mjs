@@ -99,7 +99,7 @@ async function lendingFixture(t, options = {}) {
     // The maintainer flag is off, as for every Cloud Pro user.
     enabled: async () => { maintainerChecks++; return false; },
     cloud: () => cloud, home: path.join(dir, "home"),
-    cuaConnection: async () => driver.connection,
+    cuaConnection: async () => options.linuxConnection ? { status: "ready", mcp: { command: driver.connection.mcpCommand, args: driver.connection.mcpArgs } } : driver.connection,
     hostControl: async id => { leases.push(`acquire:${id}`); return { renew: async () => {}, release: async () => { leases.push(`release:${id}`); } }; },
     onChange: summary => summaries.push(summary),
   });
@@ -179,6 +179,16 @@ test("another server behind the Cloud's address (a replaced machine) ends lendin
   await until(() => restarted.cloudState(env).problem === "machine-changed", "machine-changed");
   assert.equal(restarted.cloudState(env).enabled, false);
   assert.equal(home.connects.length, 1);
+});
+
+test("Linux ready descriptor lends screen control", async t => {
+  const { home, sharing } = await lendingFixture(t, { linuxConnection: true });
+  await sharing.saveCloud(env, { folders: [], screen: true });
+  await connected(sharing, 1, home);
+  home.push({ action: "computer_tools" });
+  await until(() => home.results.length === 1, "Linux computer tools result");
+  assert.equal(home.results[0].isError, undefined);
+  assert.ok(JSON.stringify(home.results[0]).includes("drag"));
 });
 
 test("signing out of OMB Cloud ends lending at once and cancels an action already running", async t => {

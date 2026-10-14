@@ -3617,7 +3617,7 @@ async function lendingSnapshot() {
   const connection = await cuaReady.catch(() => null);
   return {
     available: Boolean(env),
-    screenAvailable: Boolean(connection?.mcpCommand),
+    screenAvailable: Boolean(connection?.mcpCommand || (connection?.status === "ready" && connection?.mcp?.command)),
     ...(env ? { state: sharingController().cloudState(env), activity: sharingController().activity(env.id, 30) } : {}),
   };
 }

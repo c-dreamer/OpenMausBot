@@ -296,8 +296,13 @@ export function createComputerSharing({ file, fetch: fetchImpl, environments, cu
                 if (!live.cua) {
                   const connection = await cuaConnection();
                   jobSignal.throwIfAborted();
-                  if (!connection?.mcpCommand || !Array.isArray(connection.mcpArgs)) throw new Error("Computer control is unavailable. Enable it in the local app and grant OS permissions first.");
-                  live.cua = createSharedCua(connection);
+                  const mcp = connection?.mcpCommand ? connection : connection?.status === "ready" ? {
+                    mcpCommand: connection.mcp?.command,
+                    mcpArgs: connection.mcp?.args,
+                    mcpEnv: connection.mcp?.env,
+                  } : null;
+                  if (!mcp?.mcpCommand || !Array.isArray(mcp.mcpArgs)) throw new Error("Computer control is unavailable. Enable it in the local app and grant OS permissions first.");
+                  live.cua = createSharedCua(mcp);
                 }
                 return live.cua;
               });
