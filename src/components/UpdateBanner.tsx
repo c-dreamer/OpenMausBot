@@ -80,9 +80,12 @@ export function UpdateBanner({ sidebarIndicator = false }: UpdateBannerProps) {
           ? "Copying the command…"
           : s.message || `${brand().name} will reopen in a moment.`
         : s.status === "handed-off"
-          ? s.terminalOpened
-            ? "Command copied — paste it in the terminal that opened."
-            : "Command copied — paste it in a terminal to finish."
+          ? // when the automatic install could not run, say why before the steps
+            `${s.message ? `${s.message} ` : ""}${
+              s.terminalOpened
+                ? "Command copied — paste it in the terminal that opened."
+                : "Command copied — paste it in a terminal to finish."
+            }`
           : s.retryable === false
             ? `${friendlyError(s.message?.split(" Quit and reopen ")[0])} Quit and reopen ${brand().name} before trying the update again.`
             : friendlyError(s.message);

@@ -19,6 +19,8 @@ import {
   packageInstallCommand,
   stagedInstallFile,
 } from "./package-install-command.mjs";
+import { canInstallElevated, installPackageElevated } from "./elevated-install.mjs";
+import { releaseSingleInstanceLock } from "./single-instance.mjs";
 import { openBlankTerminal } from "./terminal-launch.mjs";
 import { createUpdaterCoordinator } from "./updater-coordinator.mjs";
 
@@ -54,6 +56,10 @@ function updaterLogger() {
 // electron-updater, a .deb update raises a polkit root prompt out of a chat
 // app, runs `dpkg -i` (which resolves no dependencies) and replaces
 // /opt/OpenMausBot while this very process is still running.
+// So electron-updater never installs one. A .deb is installed by
+// elevated-install.mjs when the session can show a password prompt (apt-get,
+// checksum verified as root, the app reopens at once), and every system
+// package otherwise gets the hand-off below.
 const HAND_OFF_TYPES = new Set(HAND_OFF_PACKAGE_TYPES);
 
 // Do what this app already does for engine installs: put the exact command on
@@ -66,6 +72,21 @@ export function handOffDownloadedPackage(packageType) {
     clipboard.writeText(command);
     return { command, terminalOpened: await openBlankTerminal() };
   };
+}
+
+/** Install the staged .deb behind one polkit prompt (see elevated-install.mjs).
+ * `files` are the staged paths, `sha512` what the feed declared for them. */
+export function installDownloadedPackage(files, { sha512 } = {}) {
+  return installPackageElevated({ file: stagedInstallFile(files), sha512 });
+}
+
+// The install has replaced the files under this running process, so reopen
+// right away. The update drives this quit, so the single-instance lock goes
+// first or the new copy would find it held and exit (see main.mjs).
+function relaunchAfterInstall() {
+  releaseSingleInstanceLock(app);
+  app.relaunch();
+  app.quit();
 }
 
 function setState(patch) {
@@ -136,9 +157,14 @@ export function startUpdater() {
   // wait. A system package (.deb, .rpm, pacman) is the person's to install
   // in a terminal, never ours on quit.
   autoUpdater.autoInstallOnAppQuit = !handOff;
-  setState({ installMode: handOff ? "handoff" : "restart" });
+  // A .deb that can ask for a password installs itself on "Restart to update",
+  // like the other platforms; the card then says restart, not "open a terminal".
+  const elevated = packageType === "deb" && canInstallElevated();
+  setState({ installMode: handOff && !elevated ? "handoff" : "restart" });
   updaterCoordinator = createUpdaterCoordinator(autoUpdater, setState, {
     handOffInstall: handOff ? handOffDownloadedPackage(packageType) : null,
+    elevatedInstall: elevated ? installDownloadedPackage : null,
+    relaunch: elevated ? relaunchAfterInstall : null,
     nativeStaging: process.platform === "darwin",
   });
 
