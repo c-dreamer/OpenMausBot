@@ -44,13 +44,13 @@ export function linuxDrive(canonical, mounts) {
 }
 
 /** Whether `canonical` is the root of a drive that may be shared whole. Pure: `mounts` is the Linux mount table. */
-export function isShareableDriveRoot(canonical, platform = process.platform, mounts = []) {
+export function isShareableDriveRoot(canonical, platform = process.platform, mounts = [], systemDrive = process.env.SystemDrive) {
   if (typeof canonical !== "string" || !(platform === "win32" ? path.win32 : path.posix).isAbsolute(canonical)) return false;
   // macOS: every disk, disk image and network share the person mounted appears directly under /Volumes. The startup
   // disk's own entry there is a link to "/", which the caller has already refused.
   if (platform === "darwin") return path.posix.dirname(canonical) === "/Volumes" && path.posix.basename(canonical).length > 0;
   // Windows: a drive letter. The drive that holds the home folder was refused before this is asked.
-  if (platform === "win32") return /^[A-Za-z]:\\$/.test(canonical);
+  if (platform === "win32") return /^[A-Za-z]:\\$/.test(canonical) && canonical.slice(0, 2).toLowerCase() !== String(systemDrive ?? "C:").slice(0, 2).toLowerCase();
   return linuxDrive(canonical, mounts);
 }
 
@@ -59,6 +59,6 @@ export async function readLinuxMounts() {
 }
 
 /** The check validateSharedFolders makes for a path that is a volume root. Unreadable mount tables fail closed. */
-export async function shareableDrive(canonical, platform = process.platform, readMounts = readLinuxMounts) {
-  return isShareableDriveRoot(canonical, platform, platform === "linux" ? await readMounts() : []);
+export async function shareableDrive(canonical, platform = process.platform, readMounts = readLinuxMounts, systemDrive = process.env.SystemDrive) {
+  return isShareableDriveRoot(canonical, platform, platform === "linux" ? await readMounts() : [], systemDrive);
 }

@@ -57,6 +57,7 @@ export interface CloudLendingBridge {
 }
 export type CloudLendingVerdict = { allow: true } | { pause: string } | { stop: "signed-out" | "account-changed" | "machine-changed" };
 export function cloudLendingVerdict(binding: { accountId: string; origin: string } | null | undefined, current: { status: string; accountId: string | null; origin: string | null } | null, env: { origin: string } | null | undefined): CloudLendingVerdict;
+export function confirmHomeFolder(id: string): void;
 export function isHomeFolder(target: string): Promise<boolean>;
 export function validateSharedFolders(folders: unknown): Promise<SharedFolder[]>;
 export function validSharedOperation(operation: unknown, computerId: string): boolean;

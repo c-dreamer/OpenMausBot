@@ -40,7 +40,9 @@ test("the whole home folder is lent only after its own warning, and is named in 
   const win = liveWindow(), isHome = async (path) => path === "/Users/me";
   for (const [response, lent] of [[0, true], [1, false], [-1, false]]) {
     const { dialog, calls } = fakeDialog({ response, picked: { canceled: false, filePaths: ["/Users/me"] } });
-    const folder = await createLendingDialogs({ dialog, window: () => win, validate: named, isHome }).chooseFolder("Choose a folder or drive to share");
+    const granted = [];
+    const folder = await createLendingDialogs({ dialog, window: () => win, validate: named, isHome, grantHome: (id) => granted.push(id) }).chooseFolder("Choose a folder or drive to share");
+    assert.deepEqual(granted, lent ? [folder.id] : [], "only the dialog's own OK records the confirmation in main");
     assert.equal(calls[1][0], "message");
     assert.equal(calls[1][2].message, "Share your whole home folder?");
     assert.deepEqual([calls[1][2].defaultId, calls[1][2].cancelId], [1, 1]);
@@ -109,7 +111,7 @@ function mainLending({ response }) {
   let cloudState = { enabled: true, connected: true, folders: [], screen: false, internet: true };
   const passThrough = (_channel, handler) => handler;
   const context = vm.createContext({
-    createLendingDialogs, installCloudLending, usualFolders, usualFolderPaths, dialog, mainWindow: win, validateSharedFolders: named, isHomeFolder: async () => false,
+    createLendingDialogs, installCloudLending, usualFolders, usualFolderPaths, dialog, mainWindow: win, validateSharedFolders: named, isHomeFolder: async () => false, confirmHomeFolder: () => {},
     ipcMain: { handle: (channel, handler) => handlers.set(channel, handler) }, localWorkspaceOnly: passThrough, cloudPageAsking: () => "cloud",
     requireSharedComputers: async () => {}, savedWorkspace: () => team, lendingTarget: { environment: () => cloud }, cuaReady: Promise.resolve({ mcpCommand: "cua" }),
     stopLending: () => {}, app: { getPath: (name) => `/Users/me/${name}` }, os: { homedir: () => "/Users/me" },

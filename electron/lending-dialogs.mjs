@@ -17,10 +17,11 @@ export function serverAccessDetail(env, { folders, terminal, computer }) {
  *   dialog: { showOpenDialog: Function, showMessageBox: Function },
  *   window: () => ({ isDestroyed(): boolean } | null),
  *   validate: (folders: Array<{ id: string, path: string, write: boolean, home?: boolean }>) => Promise<Array<{ id: string, path: string, name: string, write: boolean, home?: boolean }>>,
+ *   grantHome?: (id: string) => void,
  *   isHome?: (path: string) => Promise<boolean>,
  * }} deps
  */
-export function createLendingDialogs({ dialog, window, validate, isHome = async () => false }) {
+export function createLendingDialogs({ dialog, window, validate, isHome = async () => false, grantHome = () => {} }) {
   return {
     /** The folder or drive the person picks, read only and checked as every lent folder is; null when they cancel. The
      * home folder is lent only when it is picked here and confirmed here: the folders above it and the system disk never are. */
@@ -33,6 +34,8 @@ export function createLendingDialogs({ dialog, window, validate, isHome = async 
           detail: "Everything inside it becomes available to the bots you allow, including documents, downloads and any keys or logins kept in hidden folders such as .ssh. It is shared read only. Choosing specific folders is safer.",
           buttons: ["Share home folder", "Cancel"], defaultId: 1, cancelId: 1 });
         if (response !== 0) return null;
+        // Recorded in main, so a page sending `home: true` without this dialog grants nothing.
+        grantHome(folder.id);
         folder.home = true;
       }
       return (await validate([folder]))[0];

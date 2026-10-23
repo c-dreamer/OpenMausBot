@@ -32,8 +32,12 @@ test("macOS: only a direct child of /Volumes is a drive", () => {
 });
 
 test("Windows: only a bare drive letter is a drive", () => {
-  assert.equal(isShareableDriveRoot("D:\\", "win32"), true);
-  for (const no of ["D:\\Folder", "\\\\server\\share", "D:"]) assert.equal(isShareableDriveRoot(no, "win32"), false, no);
+  assert.equal(isShareableDriveRoot("D:\\", "win32", [], "C:"), true);
+  for (const no of ["D:\\Folder", "\\\\server\\share", "D:"]) assert.equal(isShareableDriveRoot(no, "win32", [], "C:"), false, no);
+  // The Windows system drive is refused whichever drive holds the profile, and its letter is compared without case.
+  assert.equal(isShareableDriveRoot("C:\\", "win32", [], "C:"), false);
+  assert.equal(isShareableDriveRoot("c:\\", "win32", [], "C:"), false);
+  assert.equal(isShareableDriveRoot("C:\\", "win32", [], "D:"), true);
 });
 
 test("shareableDrive fails closed when the Linux mount table is unreadable", async () => {
@@ -45,7 +49,7 @@ test("the home folder is lent only when asked for by the picker; its parents and
   const { mkdtempSync, mkdirSync, realpathSync, rmSync } = await import("node:fs");
   const { tmpdir } = await import("node:os");
   const path = await import("node:path");
-  const { validateSharedFolders, isHomeFolder } = await import("./computer-sharing.mjs");
+  const { validateSharedFolders, isHomeFolder, confirmHomeFolder } = await import("./computer-sharing.mjs");
   const base = realpathSync.native(mkdtempSync(path.join(tmpdir(), "omb-home-opt-in-")));
   const home = path.join(base, "me");
   mkdirSync(path.join(home, "Documents"), { recursive: true });
@@ -56,6 +60,8 @@ test("the home folder is lent only when asked for by the picker; its parents and
     assert.equal(await isHomeFolder(home), true);
     assert.equal(await isHomeFolder(path.join(home, "Documents")), false);
     await assert.rejects(validateSharedFolders([{ id, path: home, write: false }]), { code: "HOME_OR_ROOT" }, "not without the request");
+    await assert.rejects(validateSharedFolders([{ id, path: home, write: false, home: true }]), { code: "HOME_OR_ROOT" }, "the flag alone, with no confirmation from main, grants nothing");
+    confirmHomeFolder(id);
     const [lent] = await validateSharedFolders([{ id, path: home, write: true, home: true }]);
     assert.equal(lent.home, true);
     assert.equal(lent.write, false, "the home folder is read only even when edits are asked for");

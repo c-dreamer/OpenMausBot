@@ -83,7 +83,7 @@ import capabilitiesModule from "./capabilities.cjs";
 import environmentsModule from "./environments.cjs";
 import localOriginModule from "./local-origin.cjs";
 import { buildApplicationMenu } from "./menu.mjs";
-import { createComputerSharing, isHomeFolder, validateSharedFolders } from "./computer-sharing.mjs";
+import { confirmHomeFolder, createComputerSharing, isHomeFolder, validateSharedFolders } from "./computer-sharing.mjs";
 import { acquireDataDirLease } from "./data-dir-lease.mjs";
 import { switchLocalEnvironment } from "./environment-switch.mjs";
 import { createManagedDesktopClient, createManagedDesktopRelay, createManagedDesktopStore } from "./managed-desktop.mjs";
@@ -2782,7 +2782,7 @@ ipcMain.handle("sharing:state", localWorkspaceOnly("sharing:state", async (_even
   await requireSharedComputers();
   return sharingController().state(savedWorkspace(id).id);
 }));
-const lendingDialogs = createLendingDialogs({ dialog, window: () => mainWindow, validate: validateSharedFolders, isHome: isHomeFolder });
+const lendingDialogs = createLendingDialogs({ dialog, window: () => mainWindow, validate: validateSharedFolders, isHome: isHomeFolder, grantHome: confirmHomeFolder });
 ipcMain.handle("sharing:folder", localWorkspaceOnly("sharing:folder", async () => {
   await requireSharedComputers();
   return lendingDialogs.chooseFolder("Choose a folder or drive to share");
