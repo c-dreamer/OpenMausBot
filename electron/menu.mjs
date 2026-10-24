@@ -11,10 +11,12 @@ import { Menu, app } from "electron";
  * @param {(id: string) => void} input.onForget
  * @param {() => void} input.onOpenSettings
  * @param {() => void} input.onOrganizationSignIn
+ * @param {{ enabled: boolean, open: boolean, canOpen: boolean, onToggle: () => void, onOpen: () => void, onClose: () => void } | null} [input.split]
+ *   Split view (split-view.mjs): the menu is absent without it; the commands show only once the person turned it on.
  * @param {{ origin: string, onBack: () => void } | null} [input.home] My Cloud once the person's bots moved there: the
  *   menu lists only the other saved servers, with Back to My Cloud, and is absent without any.
  */
-export function buildApplicationMenu({ environments, activeId, onSwitch, onAddFromClipboard, onConnect, onForget, onOpenSettings, onOrganizationSignIn, onAddCloud, sublabels = {}, home = null }) {
+export function buildApplicationMenu({ environments, activeId, onSwitch, onAddFromClipboard, onConnect, onForget, onOpenSettings, onOrganizationSignIn, onAddCloud, sublabels = {}, home = null, split = null }) {
   const isMac = process.platform === "darwin";
   const active = environments.find((e) => e.id === activeId) ?? null;
   const others = home ? environments.filter((e) => e.origin !== home.origin && e.kind !== "local") : [];
@@ -52,12 +54,23 @@ export function buildApplicationMenu({ environments, activeId, onSwitch, onAddFr
       },
     ],
   };
+  const splitMenu = split ? {
+    label: "Split View",
+    submenu: [
+      { label: "Experimental: Show Two Places Side by Side", type: "checkbox", checked: split.enabled, click: () => split.onToggle() },
+      ...(split.enabled ? [
+        { label: "Show My Cloud Beside This Computer", enabled: split.canOpen, click: () => split.onOpen() },
+        { label: "Close the Split", enabled: split.open, click: () => split.onClose() },
+      ] : []),
+    ],
+  } : null;
   const template = [
     ...(isMac ? [{ label: app.name, submenu: [{ role: "about" }, { label: "Preferences…", accelerator: "CmdOrCtrl+,", click: () => onOpenSettings() }, { type: "separator" }, { role: "hide" }, { role: "hideOthers" }, { role: "unhide" }, { type: "separator" }, { role: "quit" }] }] : []),
     { role: "fileMenu" },
     { role: "editMenu" },
     ...(home && !others.length ? [] : [server]),
     { role: "viewMenu" },
+    ...(splitMenu ? [splitMenu] : []),
     { role: "windowMenu" },
   ];
   return Menu.buildFromTemplate(template);

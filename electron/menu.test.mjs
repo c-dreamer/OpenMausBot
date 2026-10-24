@@ -89,4 +89,18 @@ describe("buildApplicationMenu", () => {
     const onCloud = build("darwin", { environments: [cloud, office], activeId: "c", home }).find((entry) => entry.label === "Server").submenu;
     expect(onCloud.find((entry) => entry.id === "back-to-my-cloud").enabled).toBe(false);
   });
+
+  it("has no Split View menu by default; with it, the commands show only once the setting is on", () => {
+    expect(build("darwin").find((entry) => entry.label === "Split View")).toBeUndefined();
+    const split = { enabled: false, open: false, canOpen: true, onToggle: vi.fn(), onOpen: vi.fn(), onClose: vi.fn() };
+    const off = build("darwin", { split }).find((entry) => entry.label === "Split View").submenu;
+    expect(off).toHaveLength(1);
+    expect(off[0].checked).toBe(false);
+    off[0].click();
+    expect(split.onToggle).toHaveBeenCalledOnce();
+    const on = build("darwin", { split: { ...split, enabled: true, canOpen: false } }).find((entry) => entry.label === "Split View").submenu;
+    expect(on.map((entry) => [entry.label, entry.enabled])).toEqual([
+      ["Experimental: Show Two Places Side by Side", undefined], ["Show My Cloud Beside This Computer", false], ["Close the Split", false],
+    ]);
+  });
 });

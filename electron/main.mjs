@@ -109,13 +109,12 @@ import { createOrgLibrary } from "./org-library.mjs";
 import { createCompanyBackups } from "./company-backups.mjs";
 import { createCompanyBackupSchedule } from "./company-backup-schedule.mjs";
 import { installServerSessions, reportOwnListeners } from "./server-session.mjs";
+import { installSplitView } from "./split-view-main.mjs";
 
 const { desktopCapabilities, localComputerReady, nativeDesktopActions } = capabilitiesModule;
 const nativeActions = nativeDesktopActions(process.platform);
 const require = createRequire(import.meta.url);
-const { createDisplayMediaGuard, invokeDisplayMediaCallback, selectCaptureSource } = require(
-  "./screen-preview.cjs",
-);
+const { createDisplayMediaGuard, invokeDisplayMediaCallback, selectCaptureSource } = require("./screen-preview.cjs");
 const { STAGE_PREFIX: APPIMAGE_CUA_STAGE_PREFIX } = require("./cua-linux-bundle.cjs");
 const { desktopViewerUrl, sameDesktopViewerOrigin } = require("./desktop-viewer.cjs");
 const { createDesktopWorkspaceManager } = require("./desktop-workspace.cjs");
@@ -1606,7 +1605,7 @@ function refreshApplicationMenu() {
         if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send("app:open-settings");
       },
       ...cloudMenuOptions(),
-      home: homeWindow.cloudOrigin() ? { origin: homeWindow.cloudOrigin(), onBack: () => void showHome({ place: "cloud" }) } : null,
+      home: homeWindow.cloudOrigin() ? { origin: homeWindow.cloudOrigin(), onBack: () => void showHome({ place: "cloud" }) } : null, split: splitView.menu(),
     }),
   );
 }
@@ -2725,6 +2724,7 @@ const homeWindow = createHomeWindow({ journal: oneHome.journal, frozen: oneHome.
     return navigateMainWindow(rendererOrigin());
   } });
 installHomeWindowIpc({ ipcMain, homeWindow, cloudPage: cloudPageAsking });
+const splitView = installSplitView({ BrowserWindow, screen, file: path.join(app.getPath("userData"), "split-view.json"), refreshMenu: refreshApplicationMenu, blocked: () => Boolean(desktopRemoteAccess), main: () => mainWindow, localOrigin: rendererOrigin, cloudOrigin: myCloud, rendererArguments: () => desktopCompanionRendererArguments(rendererOrigin(), null), preload: path.join(__dirname, "preload.cjs"), chrome: windowChromeOptions(process.platform), minWidth: MIN_BOUNDS.width, closeOnHide: process.platform === "win32", openExternal: url => void shell.openExternal(externalWebUrl(url)).catch(() => {}), log: slog });
 /** Every path that shows the window: My Cloud once it is the person's home, else as before. */
 function showHome(options) {
   return homeWindow.show(options).catch(error => slog(`home: ${error?.message ?? error}`));
