@@ -2,6 +2,7 @@
 // Model Context Protocol (MCP) server for OpenMausBot over JSON-RPC 2.0 stdio,
 // for external agents (Hermes, Claude Desktop, Cursor, etc.).
 import readline from "node:readline";
+import { ASK_OTHER_PLACE_TOOL, OTHER_PLACE_TOOLS, askOtherPlaceBot } from "./mcp-other-place.ts";
 
 export function validateBaseUrl(url: string): string {
   const trimmed = url.replace(/\/+$/, "");
@@ -470,6 +471,7 @@ export const TOOLS: McpToolDefinition[] = [
     },
     annotations: DESTRUCTIVE,
   },
+  ...OTHER_PLACE_TOOLS,
 ];
 
 function parsePositiveLimit(raw: unknown, fallback = 30, maximum = 200): number {
@@ -876,6 +878,8 @@ export async function handleToolCall(
     : baseFetcher;
   validateToolArguments(name, args);
   switch (name) {
+    case ASK_OTHER_PLACE_TOOL.name: return askOtherPlaceBot(args, { request, waitForJob, signal });
+
     case "get_system_health": {
       const res = await fetcher("/api/health");
       if (res?.app !== "openmausbot") throw new Error("The configured endpoint is not an OpenMausBot server");
@@ -1130,9 +1134,7 @@ export async function handleToolCall(
 
     case "wait_for_conversation": {
       const targetType = args.target_type;
-      if (targetType !== "bot" && targetType !== "channel") {
-        throw new ToolInputError("target_type must be bot or channel");
-      }
+      if (targetType !== "bot" && targetType !== "channel") throw new ToolInputError("target_type must be bot or channel");
       const targetId = idArg(args, "target_id");
       const timeoutSeconds = parsePositiveLimit(args.timeout_seconds, 30, 120);
       const label = targetType === "bot" ? "Bot" : "Channel";
@@ -1236,9 +1238,7 @@ export async function handleToolCall(
 
     case "interrupt_conversation": {
       const targetType = args.target_type;
-      if (targetType !== "bot" && targetType !== "channel") {
-        throw new ToolInputError("target_type must be bot or channel");
-      }
+      if (targetType !== "bot" && targetType !== "channel") throw new ToolInputError("target_type must be bot or channel");
       const targetId = idArg(args, "target_id");
       const current = await fleet(fetcher);
       const target = (targetType === "bot" ? records(current.bots) : records(current.groups))

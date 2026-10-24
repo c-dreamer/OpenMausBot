@@ -11,6 +11,12 @@ OpenMausBot team while the desktop app and its harness are running.
 - send work to a bot or channel, wait for either conversation to settle or need help, and interrupt its active turn;
 - list configured model instances and switch an idle bot to an exact available model.
 
+- ask a bot on your other place: with `OPENMAUSBOT_OTHER_PLACE_URL` (your My Cloud's https address) and
+  `OPENMAUSBOT_OTHER_PLACE_TOKEN` (a token paired there) set, `ask_other_place_bot` sends one message to a My Cloud
+  bot and returns its reply. It is off without both, refuses an address that is not a My Cloud home, and never
+  answers an approval there: it returns `needs-user` and you answer in the app on My Cloud. Repeating a `ref` never
+  sends twice ([design](design/cross-place-commands.md)).
+
 The v1 server intentionally cannot approve requests, remember permission grants, delete data, import teams,
 change credentials, or control computer/VM lifecycle. Those actions stay in the human-facing app.
 
