@@ -878,7 +878,7 @@ export async function handleToolCall(
     : baseFetcher;
   validateToolArguments(name, args);
   switch (name) {
-    case ASK_OTHER_PLACE_TOOL.name: return askOtherPlaceBot(args, { request, waitForJob, signal });
+    case ASK_OTHER_PLACE_TOOL.name: return askOtherPlaceBot(args, { waitForJob, signal });
 
     case "get_system_health": {
       const res = await fetcher("/api/health");

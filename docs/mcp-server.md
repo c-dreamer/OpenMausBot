@@ -11,14 +11,23 @@ OpenMausBot team while the desktop app and its harness are running.
 - send work to a bot or channel, wait for either conversation to settle or need help, and interrupt its active turn;
 - list configured model instances and switch an idle bot to an exact available model.
 
-- ask a bot on your other place: with `OPENMAUSBOT_OTHER_PLACE_URL` (your My Cloud's https address) and
-  `OPENMAUSBOT_OTHER_PLACE_TOKEN` (a token paired there) set, `ask_other_place_bot` sends one message to a My Cloud
-  bot and returns its reply. It is off without both, refuses an address that is not a My Cloud home, and never
-  answers an approval there: it returns `needs-user` and you answer in the app on My Cloud. Repeating a `ref` never
-  sends twice ([design](design/cross-place-commands.md)).
-
 The v1 server intentionally cannot approve requests, remember permission grants, delete data, import teams,
 change credentials, or control computer/VM lifecycle. Those actions stay in the human-facing app.
+
+## Experimental: `ask_other_place_bot` (not recommended yet)
+
+> **Known risk.** The message this tool sends is your own line on My Cloud: the messages API has no field a client
+> can set to mark it as coming from another place. A Cloud turn it starts is therefore treated as yours, and may use
+> a computer lent to My Cloud (apps, screen, files, terminal). A prompt-injected MCP client on this computer could use
+> that. Do not turn this tool on for a client you do not fully trust. It should not be recommended until My Cloud marks
+> messages from the other place (as it already does for `peerAsk` lines, which are kept out of lending).
+
+With `OPENMAUSBOT_OTHER_PLACE_URL` (your My Cloud's https address) and `OPENMAUSBOT_OTHER_PLACE_TOKEN` (a token paired
+there) set, the tool sends one message to a My Cloud bot and returns its reply, marked untrusted. It is off without both.
+It sends no other credential, follows no redirect, and refuses an address that does not describe itself as a My Cloud
+home (a hostile address can claim that, so the check only catches mistakes: your token's scope and the address you
+choose are the protection). It never answers an approval: it returns `needs-user` and you answer in the app on My
+Cloud. Repeating a `ref` never sends twice ([design](design/cross-place-commands.md)).
 
 ## From the openmausbot command
 

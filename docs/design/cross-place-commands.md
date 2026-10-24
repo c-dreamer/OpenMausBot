@@ -94,15 +94,23 @@ the server never holds the other place's credential. Needs the maintainer's agre
   calling client must treat as data (a bot-initiated ask would wrap it as a report, `reportNote`). It cannot reach this computer: the Cloud has no inbound path, and the
   lending bridge validates every job against the grant on this side.
 - A hostile local page cannot call the tool: it is an MCP/CLI tool in a process the person configured with a
-  token in its environment, not a browser route. The token is sent only to the configured origin, which must be
-  https and must describe itself as a Cloud home before anything is sent.
-- No escalation: the ask is one `POST /api/bots/:id/messages`, which any paired device of the person can already
-  make. It adds no route and no scope. An injected local bot cannot obtain the token: it is not in the bot's
-  environment (the first slice runs in the person's MCP client, not in a bot's tool surface).
-- Open risk: a message sent with the person's token is the person's line on the Cloud, so a Cloud conversation
-  that received one can still qualify for lending. The origin tag is text, not a harness marker. Before any
-  bot-initiated ask, the Cloud must mark such lines as peer lines (`peerAsk`), which already take a conversation
-  out of lending (`cloud-lending.ts:55-65`).
+  token in its environment, not a browser route.
+- The other place's token goes to the configured address, whatever that address is. The check that it describes
+  itself as a Cloud home is claimed by the address, so a hostile address passes it: it catches a wrong address, not
+  an attacker. What protects the credential is the person choosing the address, https (plain http only for this
+  computer), no redirect followed, no ambient credential (the local `OPENMAUSBOT_TOKEN` is never sent), and the token
+  being the person's own paired device token, revocable under Settings -> Phone on My Cloud. A hostile address
+  receives that one token, nothing else.
+- OPEN RISK, live in this slice: the ask is a `POST /api/bots/:id/messages` with the person's token. That route has
+  no field a client can set to mark provenance (`peerAsk` and `relayed` are set only by the server's own peer and
+  guarded paths; `via` is not read from the body). The line is therefore the person's own on the Cloud
+  (`cloud-lending.ts:26-31` takes the sender of any user line without `peerAsk`), and a Cloud turn it starts is
+  owner-proven and may use a lent computer. A prompt-injected MCP client on this computer can thus reach the lent
+  computer through a Cloud bot. The origin tag in the text is not a marker the harness reads.
+  Prerequisite before recommending the tool: My Cloud marks messages from the other place (a server change that gives
+  such lines `peerAsk`-like treatment, which already keeps a conversation out of lending). Until then the tool is
+  experimental, off by default and documented as risky.
+- No new route or scope: any paired device of the person can already make this request.
 
 ## First slice (this branch)
 
