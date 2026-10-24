@@ -11,8 +11,8 @@ import { Menu, app } from "electron";
  * @param {(id: string) => void} input.onForget
  * @param {() => void} input.onOpenSettings
  * @param {() => void} input.onOrganizationSignIn
- * @param {{ enabled: boolean, open: boolean, canOpen: boolean, onToggle: () => void, onOpen: () => void, onClose: () => void } | null} [input.split]
- *   Split view (split-view.mjs): the menu is absent without it; the commands show only once the person turned it on.
+ * @param {{ open: boolean, onOpen: () => void, onClose: () => void } | null} [input.split]
+ *   Split view (split-view-main.mjs): null unless the feature is switched on; the open command is always enabled and says why when it cannot.
  * @param {{ origin: string, onBack: () => void } | null} [input.home] My Cloud once the person's bots moved there: the
  *   menu lists only the other saved servers, with Back to My Cloud, and is absent without any.
  */
@@ -57,11 +57,8 @@ export function buildApplicationMenu({ environments, activeId, onSwitch, onAddFr
   const splitMenu = split ? {
     label: "Split View",
     submenu: [
-      { label: "Experimental: Show Two Places Side by Side", type: "checkbox", checked: split.enabled, click: () => split.onToggle() },
-      ...(split.enabled ? [
-        { label: "Show My Cloud Beside This Computer", enabled: split.canOpen, click: () => split.onOpen() },
-        { label: "Close the Split", enabled: split.open, click: () => split.onClose() },
-      ] : []),
+      { label: "Show My Cloud Beside This Computer", click: () => split.onOpen() },
+      { label: "Close the Split", enabled: split.open, click: () => split.onClose() },
     ],
   } : null;
   const template = [

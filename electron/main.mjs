@@ -170,7 +170,7 @@ function writeWindowState(win) {
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(
       temporary,
-      JSON.stringify({ bounds: win.getNormalBounds(), maximized: win.isMaximized() }),
+      JSON.stringify(splitView.unsplit(win) ?? { bounds: win.getNormalBounds(), maximized: win.isMaximized() }),
       { mode: 0o600 },
     );
     fs.renameSync(temporary, file);
@@ -2724,7 +2724,7 @@ const homeWindow = createHomeWindow({ journal: oneHome.journal, frozen: oneHome.
     return navigateMainWindow(rendererOrigin());
   } });
 installHomeWindowIpc({ ipcMain, homeWindow, cloudPage: cloudPageAsking });
-const splitView = installSplitView({ BrowserWindow, screen, file: path.join(app.getPath("userData"), "split-view.json"), refreshMenu: refreshApplicationMenu, blocked: () => Boolean(desktopRemoteAccess), main: () => mainWindow, localOrigin: rendererOrigin, cloudOrigin: myCloud, rendererArguments: () => desktopCompanionRendererArguments(rendererOrigin(), null), preload: path.join(__dirname, "preload.cjs"), chrome: windowChromeOptions(process.platform), minWidth: MIN_BOUNDS.width, closeOnHide: process.platform === "win32", openExternal: url => void shell.openExternal(externalWebUrl(url)).catch(() => {}), log: slog });
+const splitView = installSplitView({ BrowserWindow, screen, file: path.join(app.getPath("userData"), "split-view.json"), refreshMenu: refreshApplicationMenu, blocked: () => Boolean(desktopRemoteAccess), main: () => mainWindow, localOrigin: rendererOrigin, cloudOrigin: myCloud, rendererArguments: () => desktopCompanionRendererArguments(rendererOrigin(), null), preload: path.join(__dirname, "preload.cjs"), chrome: windowChromeOptions(process.platform), minWidth: MIN_BOUNDS.width, minHeight: MIN_BOUNDS.height, icon: APP_ICON, allowHttp: process.env.OMB_SPLIT_VIEW_ALLOW_HTTP === "1", notify: text => void dialog.showMessageBox({ type: "info", message: "Split view", detail: text }), closeOnHide: process.platform === "win32", openExternal: url => void shell.openExternal(externalWebUrl(url)).catch(() => {}), log: slog });
 /** Every path that shows the window: My Cloud once it is the person's home, else as before. */
 function showHome(options) {
   return homeWindow.show(options).catch(error => slog(`home: ${error?.message ?? error}`));

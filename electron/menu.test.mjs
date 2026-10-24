@@ -90,17 +90,14 @@ describe("buildApplicationMenu", () => {
     expect(onCloud.find((entry) => entry.id === "back-to-my-cloud").enabled).toBe(false);
   });
 
-  it("has no Split View menu by default; with it, the commands show only once the setting is on", () => {
+  it("has no Split View menu unless it is passed; the open command is always enabled, close only while open", () => {
     expect(build("darwin").find((entry) => entry.label === "Split View")).toBeUndefined();
-    const split = { enabled: false, open: false, canOpen: true, onToggle: vi.fn(), onOpen: vi.fn(), onClose: vi.fn() };
-    const off = build("darwin", { split }).find((entry) => entry.label === "Split View").submenu;
-    expect(off).toHaveLength(1);
-    expect(off[0].checked).toBe(false);
-    off[0].click();
-    expect(split.onToggle).toHaveBeenCalledOnce();
-    const on = build("darwin", { split: { ...split, enabled: true, canOpen: false } }).find((entry) => entry.label === "Split View").submenu;
-    expect(on.map((entry) => [entry.label, entry.enabled])).toEqual([
-      ["Experimental: Show Two Places Side by Side", undefined], ["Show My Cloud Beside This Computer", false], ["Close the Split", false],
-    ]);
+    const split = { open: false, onOpen: vi.fn(), onClose: vi.fn() };
+    const idle = build("darwin", { split }).find((entry) => entry.label === "Split View").submenu;
+    expect(idle.map((entry) => [entry.label, entry.enabled])).toEqual([["Show My Cloud Beside This Computer", undefined], ["Close the Split", false]]);
+    idle[0].click();
+    expect(split.onOpen).toHaveBeenCalledOnce();
+    const open = build("darwin", { split: { ...split, open: true } }).find((entry) => entry.label === "Split View").submenu;
+    expect(open[1].enabled).toBe(true);
   });
 });
