@@ -65,6 +65,24 @@ function parseHostedWorkspaceLink(input) {
   }
 }
 
+/** The in-window This computer | My Cloud switch: the renderer names only one of the two places, never a saved entry or
+ * address; `target` resolves a place to the saved entry's id (null when there is none) and `go` switches like the menu.
+ * `pageAllowed`: only this computer's page and the person's own Cloud page may ask, never another saved server. */
+function installWorkspaceGo({ ipcMain, workspaceOnly, pageAllowed, target, go }) {
+  ipcMain.handle("workspaces:go", workspaceOnly((event, place) => {
+    if (!pageAllowed(event)) throw new Error("Switching places is only available in this app's window");
+    if (place !== "local" && place !== "cloud") throw new Error("Choose This computer or My Cloud.");
+    const id = target(place);
+    if (!id) throw new Error("There is no Cloud to switch to.");
+    return go(id);
+  }));
+}
+
+/** Whether My Cloud is saved here, told only to the pages allowed to switch to it: another saved server must not learn it. */
+function cloudPlaceState(cloudEntry, activeId, pageAllowed) {
+  return cloudEntry && pageAllowed ? { cloud: { active: cloudEntry.id === activeId } } : {};
+}
+
 /** Remote renderers learn only their current workspace, never the local list. */
 function workspaceSummary(state) {
   const active = activeEnvironment(state);
@@ -434,6 +452,8 @@ module.exports = {
   workspaceMenuTemplate,
   placesLine,
   placesMenuOptions,
+  installWorkspaceGo,
+  cloudPlaceState,
   sendLine,
   workspaceNavigationAllowed,
   workspaceSenderAllowed,

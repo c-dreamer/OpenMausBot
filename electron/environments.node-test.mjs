@@ -459,3 +459,27 @@ test("the session's teams become saved places, named and roled as the Admin says
   const saved = { environments: [{ id: "s", kind: "remote", name: "Acme (saved by hand)", origin: TEAM }], activeId: "s" };
   assert.deepEqual(env.reconcileTeams(saved, [acme()], makeId, home).state.environments, [{ id: "s", kind: "remote", name: "Acme", origin: TEAM, team: { id: "team-acme", role: "admin" } }], "a server saved by hand at the team's address becomes the team's entry");
 });
+
+test("the in-window switch takes only local or cloud from an allowed page, resolves the entry in main, and refuses a missing Cloud", async () => {
+  const handlers = new Map(), switched = [];
+  const install = (extra) => env.installWorkspaceGo({ ipcMain: { handle: (channel, handler) => handlers.set(channel, handler) }, workspaceOnly: (handler) => handler,
+    pageAllowed: () => true, target: (place) => (place === "cloud" ? "c1" : "local"), go: async (id) => { switched.push(id); }, ...extra });
+  install();
+  const go = handlers.get("workspaces:go");
+  await go({}, "cloud"); await go({}, "local");
+  assert.deepEqual(switched, ["c1", "local"]);
+  for (const bad of ["c1", "https://evil.example", undefined, { id: "c1" }]) assert.throws(() => go({}, bad), /Choose This computer or My Cloud/);
+  install({ pageAllowed: () => false });
+  assert.throws(() => handlers.get("workspaces:go")({}, "cloud"), /only available in this app's window/, "another saved server cannot switch the window");
+  assert.deepEqual(switched, ["c1", "local"]);
+  install({ target: () => null, go: async () => { throw new Error("unreachable"); } });
+  assert.throws(() => handlers.get("workspaces:go")({}, "cloud"), /no Cloud/);
+});
+
+test("whether My Cloud is saved here is told only to a page that may switch to it", () => {
+  const cloud = { id: "c1" };
+  assert.deepEqual(env.cloudPlaceState(cloud, "c1", true), { cloud: { active: true } });
+  assert.deepEqual(env.cloudPlaceState(cloud, "local", true), { cloud: { active: false } });
+  assert.deepEqual(env.cloudPlaceState(cloud, "c1", false), {}, "a saved remote server learns nothing about My Cloud");
+  assert.deepEqual(env.cloudPlaceState(null, "local", true), {});
+});

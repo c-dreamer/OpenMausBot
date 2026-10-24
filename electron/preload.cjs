@@ -101,6 +101,9 @@ const bridge = {
     state: () => ipcRenderer.invoke("workspaces:state"),
     menu: (options) => ipcRenderer.invoke("workspaces:menu", ...(options?.from === "howto" ? ["howto"] : [])),
     line: () => ipcRenderer.invoke("workspaces:line"),
+    // Only "local" or "cloud", from the person's click; main picks the saved entry.
+    go: (place) => isLocalPage || navigator.userActivation?.isActive === true
+      ? ipcRenderer.invoke("workspaces:go", place === "cloud" ? "cloud" : "local") : Promise.reject(new Error("Choose a place to switch.")),
   },
   getCapabilities: () => ipcRenderer.invoke("desktop:capabilities"),
   onCapabilitiesChanged: (cb) => {

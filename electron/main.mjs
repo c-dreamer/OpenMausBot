@@ -1480,7 +1480,7 @@ ipcMain.on("desktop:unread-count", (event, value) => {
   applyUnreadBadge(sender);
 });
 
-const { LOCAL_ID, activeEnvironment, activeRemote, allowedOrigins, bootEnvironmentDir, otherPlaces, parseHostedWorkspaceLink, startupEnvironmentDir, withActive, withEnvironment, withEnvironmentLook, withLocalEnvironment, withMicrophone, withoutEnvironment, withTeam, placesMenuOptions, workspaceMenuTemplate, workspaceNavigationAllowed, workspaceSenderAllowed, workspaceSummary, workspaceWindowTitle } = environmentsModule;
+const { LOCAL_ID, activeEnvironment, activeRemote, allowedOrigins, bootEnvironmentDir, otherPlaces, parseHostedWorkspaceLink, startupEnvironmentDir, withActive, withEnvironment, withEnvironmentLook, withLocalEnvironment, withMicrophone, withoutEnvironment, withTeam, placesMenuOptions, installWorkspaceGo, cloudPlaceState, workspaceMenuTemplate, workspaceNavigationAllowed, workspaceSenderAllowed, workspaceSummary, workspaceWindowTitle } = environmentsModule;
 let environmentsState = { environments: [], activeId: LOCAL_ID };
 let computerSharing;
 const sharingPrompts = new Set();
@@ -2813,10 +2813,10 @@ ipcMain.handle("environments:add-from-link", localWorkspaceOnly("environments:ad
 }));
 ipcMain.handle("environments:forget", localWorkspaceOnly("environments:forget", (_event, id, purge) => forgetEnvironment(typeof id === "string" ? id : "", purge === true)));
 
-// A cloud page may open the native chooser, never choose a destination or edit the saved list.
+installWorkspaceGo({ ipcMain, workspaceOnly, pageAllowed: event => cloudPageAsking(event) !== null, target: place => (place === "local" ? LOCAL_ID : cloudHomeEntry()?.id ?? null), go: id => workspaceMenuAction(() => switchEnvironment(id)) });
 // Once My Cloud is home the switcher lists only whole places, and shows only when there is more than My Cloud.
 const homeAlone = () => Boolean(homeWindow.cloudOrigin()) && !otherPlaces(environmentsState, homeWindow.cloudOrigin());
-ipcMain.handle("workspaces:state", workspaceOnly(event => ({ ...workspaceSummary(environmentsState), ...(homeAlone() && homeWindow.homePage(event) ? { home: true } : {}) })));
+ipcMain.handle("workspaces:state", workspaceOnly(event => ({ ...workspaceSummary(environmentsState), ...cloudPlaceState(cloudHomeEntry(), environmentsState.activeId, cloudPageAsking(event) !== null), ...(homeAlone() && homeWindow.homePage(event) ? { home: true } : {}) })));
 ipcMain.handle("workspaces:line", workspaceOnly(() => homePlaces.line()));
 let workspaceMenuOpen = false;
 ipcMain.handle("workspaces:menu", workspaceOnly(async (_event, from) => {

@@ -6,6 +6,7 @@ import { cloudColor } from "@/lib/cloud-look";
 import { t } from "@/lib/i18n";
 import { CloudTile } from "./cloud-buy/parts";
 import { SIMPLE_RAIL_BUTTON } from "./SidebarSimpleTop";
+import { PlaceSwitch, type Place } from "./PlaceSwitch";
 
 export function openServerMenu(bridge: { menu: (options?: { from?: "howto" }) => Promise<void> }, { howTo = false, onClosed }: { howTo?: boolean; onClosed?: () => void } = {}): Promise<void> {
   return bridge.menu(howTo ? { from: "howto" } : undefined).finally(() => { if (howTo) onClosed?.(); });
@@ -39,6 +40,21 @@ export function useCloudPower(cloudHome: boolean): { sleeps: boolean | null; wak
   return { sleeps: plan ? sleeps : null, waking };
 }
 
+/** My Cloud's plan: whether it sleeps when idle, on any page of the app and re-read when the window regains focus. */
+export function useCloudSleeps(): boolean | null {
+  const [sleeps, setSleeps] = useState<boolean | null>(null);
+  useEffect(() => {
+    const plan = window.ogb?.remoteClient?.active ? undefined : window.ogb?.cloudPlan;
+    if (!plan) return;
+    let alive = true;
+    const read = () => void plan.state().then((state) => { if (alive) setSleeps(planSleeps(state)); }).catch(() => {});
+    read();
+    window.addEventListener("focus", read);
+    return () => { alive = false; window.removeEventListener("focus", read); };
+  }, []);
+  return sleeps;
+}
+
 /**
  * Security: the dropdown is native; a remote workspace cannot choose a destination or read the other workspaces saved
  * here.
@@ -47,7 +63,7 @@ export function DesktopWorkspaceSwitcher({ compact = false, inline = false, pill
   compact?: boolean; inline?: boolean; pill?: boolean; rail?: boolean; cloudHome?: boolean; owner?: string | null; howTo?: boolean; onMenuClosed?: () => void;
 }) {
   const bridge = window.ogb?.workspaces;
-  const [current, setCurrent] = useState<{ local: boolean; name: string; origin?: string; color?: string; home?: boolean } | null>(null);
+  const [current, setCurrent] = useState<{ local: boolean; name: string; origin?: string; color?: string; home?: boolean; cloud?: { active: boolean } } | null>(null);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState("");
   useEffect(() => {
@@ -56,6 +72,7 @@ export function DesktopWorkspaceSwitcher({ compact = false, inline = false, pill
     return () => { alive = false; };
   }, [bridge]);
   const power = useCloudPower(cloudHome || current?.home === true);
+  const cloudSleeps = useCloudSleeps();
   const onLine = power.sleeps === null ? "" : t(power.sleeps ? "cloudSetup.sleepsWhenIdle" : "cloudSetup.alwaysOn");
   const waking = power.waking ? t("cloudHome.waking") : "";
   const withPower = (name: string) => (onLine ? `${name} · ${onLine}` : name);
@@ -100,6 +117,18 @@ export function DesktopWorkspaceSwitcher({ compact = false, inline = false, pill
     </button>
     {error && <p role="alert" className="absolute bottom-0 left-full z-40 ml-2 w-56 rounded-md bg-menu px-2 py-1 text-[11px] text-danger shadow-lg">{error}</p>}
     {waking && !error && <p role="status" data-cloud-waking className="absolute bottom-0 left-full z-40 ml-2 w-56 rounded-md bg-menu px-2 py-1 text-[11px] text-ink-secondary shadow-lg">{waking}</p>}
+  </div>;
+  const goTo = (place: Place) => {
+    setError("");
+    void bridge.go?.(place).catch(() => setError(t("sidebar.switchServerError")));
+  };
+  if (inline && current?.cloud && bridge.go) return <div data-workspace-switcher="inline" className="flex min-w-0">
+    <PlaceSwitch pill={pill} active={cloudHome || current.cloud.active ? "cloud" : current.local ? "local" : null} onGo={goTo}
+      power={cloudSleeps === null ? "" : t(cloudSleeps ? "cloudSetup.sleepsWhenIdle" : "cloudSetup.alwaysOn")}
+      menu={<button type="button" aria-label={label} aria-haspopup="menu" aria-expanded={open} data-tour="server-switcher" title={title} onClick={openMenu}
+        className="flex h-full shrink-0 items-center rounded-full px-1 text-ink-secondary hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+        style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}><ChevronDown size={12} aria-hidden="true" /></button>} />
+    {error && <p role="alert" className="absolute right-2 top-full z-40 mt-1 w-56 max-w-[calc(100%-1rem)] rounded-md bg-menu px-2 py-1 text-[11px] text-danger shadow-lg">{error}</p>}
   </div>;
   if (inline) return <div data-workspace-switcher="inline" className="flex min-w-0">
     <button type="button" aria-label={label} aria-haspopup="menu" aria-expanded={open} data-cloud-home-indicator={cloudHome || undefined}
