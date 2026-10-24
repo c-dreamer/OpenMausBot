@@ -46,6 +46,32 @@ provenance field, so the ask lands as the person's OWN line on the Cloud, which 
 a prompt-injected MCP client on this computer could therefore drive a Cloud bot that holds a lent computer. The origin
 tag is text the harness does not read. Fix needed before recommending it: My Cloud must mark such lines.
 
+## 1b. The move model today (verified)
+
+- **The unit is the whole computer, not a bot.** `electron/cloud-send.mjs:6-10`: the move is "the same send run to carry
+  everything this computer has", every bot and its chats. The journal is one per computer (`electron/one-home.mjs:1-12`,
+  phases copy, wait, freeze, final, check, switch, done). The only opt-out is also whole-computer: `keep`
+  (`one-home.mjs:19-22`, `parseKeep` line 90). I found no per-bot pin, move or keep (searched `one-home.mjs`,
+  `cloud-send-parts.mjs`, `cloud-send-kinds.mjs`; absence of evidence, not proof).
+- **A copy that then freezes, not a shared bot.** Send is "one direction; added and updated, never deleted"
+  (`cloud-send.mjs:1-3`). Bot config, skills, logins, settings, each bot's memory and journal
+  (`cloud-send-kinds.mjs:127-146`), conversation settings, rooms with their `memberIds` and bulletin
+  (`server/cloud-send-chats.ts:33,131,216`) and files (`cloud-send-files`) are copied; chats go by row after the last
+  row the Cloud took (`cloud-send.mjs:2-3`). After `switch`, this computer's server is frozen (`server/move-freeze.ts:1-5`):
+  no turns, schedules or webhooks; every change but the move's is refused with `MOVED_REFUSAL` "This bot lives on My Cloud
+  now" (`move-freeze.ts:15`). "Nothing ever runs in two places" is an explicit invariant (`one-home.mjs:14-16`).
+- **Which side keeps the transcript.** Before the switch both hold it (copy, local still live). After it, the Cloud is
+  authoritative and this computer holds a frozen read-only copy kept 30 days (`KEPT_MS`, `one-home.mjs:40`).
+  Post-move conversations exist only on the Cloud. Coming home (`home-again`/`keeping`) copies the Cloud's rows back.
+- **Stub or pointer left behind.** The local copy is a full frozen copy plus the `moved.json` marker and a `/home` screen
+  (`move-freeze.ts:15-17`); not a per-bot stub. The Cloud "keeps which computer its bots came from" (`one-home.mjs:9`).
+- **Ids.** Rooms carry local bot ids in `memberIds` (`cloud-send-chats.ts:131`), so ids appear to be preserved by the copy
+  (UNVERIFIED: whether the Cloud re-keys on collision). Hence the SAME bot cannot be live in both places today, and
+  "two copies of one bot" would have the same id in two stores.
+
+Consequence: the owner's request (a local bot and a Cloud bot live at once, talking, in shared groups) contradicts the
+"one place at a time" invariant. It cannot be met by the move machinery; it needs a second, explicit mode.
+
 ## 2. What is missing (the owner's two asks)
 
 1. Direct commands: a local bot cannot message a Cloud bot as a bot (only an external MCP client can), and the Cloud
@@ -80,6 +106,26 @@ stubs; each stub is a confused-deputy surface. Also reintroduces the unmarked-li
 
 Reasoning in one line: A keeps one writer and one transcript, reuses the only already-reviewed outbound bridge, and
 makes the trust rules enforceable at one place (the Cloud) rather than reconciled across two.
+
+### 4.0 Working with the move model: "pin local"
+
+Revised stance. Hybrid needs a per-bot **pin**: a bot marked "stays on this computer" that the move skips, is not frozen,
+and keeps running locally while the rest of the account is Cloud-home. Today only a whole-computer `keep` exists, which
+disables the move entirely, so pin is NEW and is the true first slice (see 7). Answers:
+- *Can a bot be pinned?* Not today. Proposed: `pinnedLocal` on the bot record, excluded by `planSend`
+  (`cloud-send-parts.mjs`) and by the freeze (`move-freeze.ts` currently freezes the whole server; it would need to admit
+  turns for pinned bots only; UNVERIFIED how invasive, since it is a server-wide marker).
+- *Stub left behind by a moved bot?* Recommended: yes, a thin pointer (`{id, name, place:"cloud"}`) replaces the frozen
+  full copy for moved bots, so a local group or @mention can say "lives on My Cloud" and route via the remote path; pinned
+  bots leave a matching pointer on the Cloud, which IS the remote member of 4.1. One mechanism, two directions.
+- *Two copies of the same bot at once?* Not supported: same id, memory and journal would fork with no merge. Instead the
+  person makes a second distinct bot (a "clone": new id, copied config, empty memory). Called out as a decision (Q8).
+- *Member moves mid-conversation.* The group's host is fixed (the Cloud), so the transcript does not move. If a local
+  bot is moved to the Cloud while a turn is in flight, the move already waits for a quiet moment (`one-home.mjs:5`
+  `wait`); then its `RemoteMember` entry is converted to an ordinary local `memberIds` entry on the Cloud (same id) and
+  in-flight remote `jobId`s are refused with "bot moved". If a bot is pinned local after being on the Cloud, the reverse,
+  with its memory brought down (same code path as `keeping`/`back`, `one-home.mjs:19-22`). Never both: a bot is a
+  member in exactly one form.
 
 ### 4.1 Data model (proposed)
 
@@ -194,6 +240,7 @@ shown in team/shared rooms. Telemetry: counts only, never content (like `lending
 ## 7. Minimal first slice (shippable, testable)
 
 One direction, one bot, no UI redesign:
+0. Desktop+server: per-bot `pinnedLocal` (skipped by the move, still live when the computer is otherwise frozen/lent). Ship and test this alone first; it also gives the owner 'a bot that stays local' without any group.
 1. Cloud: `remoteMembers` on the group record + flag + the `bot-turn` job kind and result route, text only, drop-on-offline.
 2. Desktop: validate job against grant + opt-in, run the local bot via loopback, return reply.
 3. Cloud room engine: remote member as mention/default-responder target; badge and offline row in the transcript.
@@ -219,11 +266,13 @@ Not in slice: attachments, queueing, cards, `@everyone` fan-out to remote member
 4. Drop vs short-TTL queue when the computer is offline; what TTL?
 5. Is a per-bot "can join Cloud groups" opt-in the right granularity, or per group?
 6. Agree the ask-line marker (5.1) as a prerequisite and as its own PR?
-7. Teams: should hybrid ever work in shared rooms (this design says no)?
+7. Per-bot pin: is a per-bot exception to the whole-computer freeze acceptable, or must hybrid use a separate second server/profile?
+8. Same-bot two copies vs distinct clone (this doc recommends distinct bots).
+9. Teams: should hybrid ever work in shared rooms (this design says no)?
 
 ## 10. Not verified
 
-How a local turn can be started from a transcript it does not own (`startTurn`, `index.ts:7607` takes local thread ids);
+Whether any per-bot move/pin exists outside the files I searched; whether the freeze can be per-bot; whether ids survive the copy unchanged; How a local turn can be started from a transcript it does not own (`startTurn`, `index.ts:7607` takes local thread ids);
 whether the lending job queue/poll can carry a new job kind without a contract-version bump; Cloud-side behaviour of
 `sendId` with remote turns; whether usage/billing ledgers handle a turn whose thread is ephemeral; real wake latency
 under the poll; Windows/Linux parity of the desktop path; the exact current Admin-side contract for lending grants.
