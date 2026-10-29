@@ -925,3 +925,20 @@ test("the check-failure notice never covers a staged update: hourly re-checks th
   for (let i = 0; i < 4; i++) await h.coordinator.check();
   assert.deepEqual(h.getState(), staged);
 });
+
+test("a check that emits an error and rejects with a different one counts as one quiet failure", async () => {
+  const h = harness();
+  h.updater.checkForUpdates = () => {
+    h.updater.emit("error", new Error("offline"));
+    return Promise.reject(new Error("offline"));
+  };
+
+  await h.coordinator.check();
+  await h.coordinator.check();
+  assert.equal(h.getState().status, "idle");
+  assert.equal(errorStates(h.states).length, 0);
+
+  await h.coordinator.check();
+  assert.equal(h.getState().status, "error");
+  assert.match(h.getState().message, /Couldn't check for updates/);
+});

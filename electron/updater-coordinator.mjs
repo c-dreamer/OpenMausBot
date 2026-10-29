@@ -184,13 +184,13 @@ export function createUpdaterCoordinator(
     try {
       operation.promise = Promise.resolve(updater.checkForUpdates())
         .catch((error) => {
-          if (!operation.supersededByDownload && !(operation.recheck && !operation.manual)) handleRejectedOperation(operation.manual, error);
+          if (!operation.failed && !operation.supersededByDownload && !(operation.recheck && !operation.manual)) handleRejectedOperation(operation.manual, error);
         })
         .finally(() => {
           if (checkOperation === operation) checkOperation = null;
         });
     } catch (error) {
-      if (!operation.supersededByDownload && !(operation.recheck && !operation.manual)) handleRejectedOperation(operation.manual, error);
+      if (!operation.failed && !operation.supersededByDownload && !(operation.recheck && !operation.manual)) handleRejectedOperation(operation.manual, error);
       checkOperation = null;
       operation.promise = Promise.resolve();
     }
