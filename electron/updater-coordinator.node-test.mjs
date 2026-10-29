@@ -942,3 +942,26 @@ test("a check that emits an error and rejects with a different one counts as one
   assert.equal(h.getState().status, "error");
   assert.match(h.getState().message, /Couldn't check for updates/);
 });
+
+test("the check-failure notice stays up while the next hourly check runs, and a manual retry still shows checking", async () => {
+  const h = harness();
+  h.updater.checkForUpdates = () => Promise.reject(new Error("offline"));
+  for (let i = 0; i < 3; i++) await h.coordinator.check();
+  assert.equal(h.getState().status, "error");
+
+  let before = h.states.length;
+  h.updater.checkForUpdates = () => {
+    h.updater.emit("checking-for-update");
+    return Promise.reject(new Error("offline"));
+  };
+  await h.coordinator.check();
+  assert.deepEqual(h.states.slice(before).map((entry) => entry.status), ["error"]);
+
+  before = h.states.length;
+  h.updater.checkForUpdates = async () => {
+    h.updater.emit("checking-for-update");
+    h.updater.emit("update-not-available");
+  };
+  await h.coordinator.check(true);
+  assert.deepEqual(h.states.slice(before).map((entry) => entry.status), ["checking", "idle"]);
+});

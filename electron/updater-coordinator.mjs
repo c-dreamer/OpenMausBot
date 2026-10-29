@@ -110,7 +110,8 @@ export function createUpdaterCoordinator(
   }
 
   updater.on("checking-for-update", () => {
-    if (checkOwnsState()) setState({ status: "checking" });
+    // The banner shows nothing while checking, so a quiet check must not replace the notice; a manual retry still shows it.
+    if (checkOwnsState() && (checkOperation?.manual || quietFailures < QUIET_FAILURES_BEFORE_NOTICE)) setState({ status: "checking" });
   });
   updater.on("update-available", (info) => {
     quietFailures = 0;
