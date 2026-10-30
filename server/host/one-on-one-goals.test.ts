@@ -1,7 +1,7 @@
 // A one-on-one goal's step against fake deps. The chat looks free, yet startTurn keeps refusing the
 // turn as busy: the step retries, and once the retries have filled the wait cap the run ends blocked,
-// as a busy wait does, instead of spinning forever. A single lost race still retries, and the goal
-// finishes on the done marker.
+// as a busy wait does, instead of spinning forever. A lost race followed by a busy chat shares that one
+// cap. A single lost race still retries, and the goal finishes on the done marker.
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { HostTurnResult } from "../coordinator.ts";
@@ -21,7 +21,7 @@ const DONE = `${GROUP_GOAL_CONTROL_OPEN}{"status":"completed","detail":"Done."}$
 const refused = (code: string) => Object.assign(new Error("this thread is already working"), { code });
 
 /** A goal in a chat whose startTurn is scripted; the real goal-turns hold the lead, so a reply can be filled in. */
-function goalChat(startTurn: (call: number, lead: GoalLeadTurn, settle: (outcome: HostTurnResult) => void) => Promise<unknown>) {
+function goalChat(startTurn: (call: number, lead: GoalLeadTurn, settle: (outcome: HostTurnResult) => void) => Promise<unknown>, canStart: () => boolean = () => true) {
   const run: LiveGoalRun = {
     runId: "r",
     cardMessageId: "card",
@@ -64,7 +64,7 @@ function goalChat(startTurn: (call: number, lead: GoalLeadTurn, settle: (outcome
         turns.end(threadId, turn, outcome);
       },
     },
-    canStart: () => true,
+    canStart,
     isUnattended: () => false,
     startTurn: (_botId, _text, opts) => startTurn(++starts, lead, opts.onSettled),
   }).start("b", "t", "Fix the build");
@@ -87,6 +87,17 @@ describe("a one-on-one goal whose turn keeps losing its slot", () => {
     await vi.advanceTimersByTimeAsync(10_000);
     expect(chat.starts()).toBe(starts);
     expect(new Set(chat.ends)).toEqual(new Set(["busy"]));
+  });
+
+  it("shares one wait cap between a lost slot and the busy wait after it", async () => {
+    vi.useFakeTimers();
+    let busy = false;
+    const chat = goalChat(() => { busy = true; return Promise.reject(refused("thread_busy")); }, () => !busy);
+    // Without one shared cap the busy wait would start its own full cap after the lost slot.
+    await vi.advanceTimersByTimeAsync(GROUP_GOAL_WAIT_MAX_MS + 100);
+    expect(chat.finished).toEqual([{ status: "blocked", detail: expect.stringMatching(/^Solo stayed busy/) }]);
+    expect(chat.starts()).toBe(1);
+    expect(chat.run.turnCount).toBe(0);
   });
 
   it("retries one lost race and finishes on the done marker", async () => {
