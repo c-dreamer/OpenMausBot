@@ -90,15 +90,17 @@ export function createOneOnOneGoals(deps: OneOnOneGoalDeps) {
 
   async function step(goal: LiveGoal, threadId: string, request: { id: string; origin: WorkOrigin }, bot: BotRecord, instructions: string): Promise<GoalStepResult> {
     const { run } = goal;
+    const stayedBusy = (): GoalStepResult => {
+      const minutes = Math.max(1, Math.round(GROUP_GOAL_WAIT_MAX_MS / 60_000));
+      return { ran: false, replyText: "", outcome: "busy", stopReason: `${bot.name} stayed busy for ${minutes} minute${minutes === 1 ? "" : "s"}` };
+    };
+    let lostRaces = 0;
     for (;;) {
       if (goal.cancelled || run.turnCount >= run.maxTurns) return { ran: false, replyText: "" };
       const free = await waitUntilFree(goal, bot, threadId);
       if (free === "cancelled") return { ran: false, replyText: "", outcome: "cancelled" };
       if (free === "unavailable") return { ran: false, replyText: "", outcome: "unavailable", stopReason: `${bot.name} is no longer available` };
-      if (free === "timed_out") {
-        const minutes = Math.max(1, Math.round(GROUP_GOAL_WAIT_MAX_MS / 60_000));
-        return { ran: false, replyText: "", outcome: "busy", stopReason: `${bot.name} stayed busy for ${minutes} minute${minutes === 1 ? "" : "s"}` };
-      }
+      if (free === "timed_out") return stayedBusy();
       let settle!: (outcome: HostTurnResult) => void;
       const settled = new Promise<HostTurnResult>((resolve) => { settle = resolve; });
       const lead = deps.turns.begin(threadId);
@@ -118,6 +120,8 @@ export function createOneOnOneGoals(deps: OneOnOneGoalDeps) {
           const message = error instanceof Error ? error.message : String(error);
           if (code === "thread_busy" || code === "thread_limit") {
             outcome = "busy";
+            // The chat looked free but the turn kept losing its slot; past the wait cap the run ends blocked, as a busy wait does.
+            if (++lostRaces * LOST_RACE_RETRY_MS >= GROUP_GOAL_WAIT_MAX_MS) return stayedBusy();
             await new Promise((resolve) => setTimeout(resolve, LOST_RACE_RETRY_MS));
             continue;
           }
