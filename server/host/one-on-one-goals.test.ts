@@ -38,12 +38,13 @@ function goalChat(startTurn: (call: number, lead: GoalLeadTurn, settle: (outcome
   const turns = createGoalTurns({ retireProviderTurn() {} });
   let lead!: GoalLeadTurn;
   let starts = 0;
+  let botChanged: ((change: { type: "bot"; botId: string }) => void) | undefined;
   createOneOnOneGoals({
     store: {
       bot: () => ({ id: "b", name: "Solo" } as BotRecord),
       taskByThread: () => ({} as TaskRecord),
       appendMessage: () => ({ id: "m1" } as Message),
-      onChange: () => () => {},
+      onChange: (listener) => { botChanged = listener as typeof botChanged; return () => {}; },
       titleTaskFromFirstMessage: () => null,
     },
     cards: {
@@ -68,7 +69,8 @@ function goalChat(startTurn: (call: number, lead: GoalLeadTurn, settle: (outcome
     isUnattended: () => false,
     startTurn: (_botId, _text, opts) => startTurn(++starts, lead, opts.onSettled),
   }).start("b", "t", "Fix the build");
-  return { run, finished, ends, starts: () => starts };
+  // The store's change event for the bot, as the real store fires it when the bot's turn ends.
+  return { run, finished, ends, starts: () => starts, botChanged: () => botChanged?.({ type: "bot", botId: "b" }) };
 }
 
 describe("a one-on-one goal whose turn keeps losing its slot", () => {
@@ -94,10 +96,29 @@ describe("a one-on-one goal whose turn keeps losing its slot", () => {
     let busy = false;
     const chat = goalChat(() => { busy = true; return Promise.reject(refused("thread_busy")); }, () => !busy);
     // Without one shared cap the busy wait would start its own full cap after the lost slot.
-    await vi.advanceTimersByTimeAsync(GROUP_GOAL_WAIT_MAX_MS + 100);
+    await vi.advanceTimersByTimeAsync(GROUP_GOAL_WAIT_MAX_MS - 1);
+    expect(chat.finished).toEqual([]);
+    await vi.advanceTimersByTimeAsync(101);
     expect(chat.finished).toEqual([{ status: "blocked", detail: expect.stringMatching(/^Solo stayed busy/) }]);
     expect(chat.starts()).toBe(1);
     expect(chat.run.turnCount).toBe(0);
+  });
+
+  it("starts the turn when the chat frees up just before the shared cap runs out", async () => {
+    vi.useFakeTimers();
+    let busy = false;
+    const chat = goalChat(async (call, lead, settle) => {
+      if (call === 1) { busy = true; throw refused("thread_busy"); }
+      lead.assistantItems.push(DONE);
+      settle({ ok: true, text: "" });
+    }, () => !busy);
+    await vi.advanceTimersByTimeAsync(GROUP_GOAL_WAIT_MAX_MS - 300);
+    busy = false;
+    chat.botChanged();
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(chat.starts()).toBe(2);
+    expect(chat.run.turnCount).toBe(1);
+    expect(chat.finished).toEqual([{ status: "completed", detail: "Done." }]);
   });
 
   it("retries one lost race and finishes on the done marker", async () => {
