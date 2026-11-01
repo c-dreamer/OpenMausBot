@@ -54,7 +54,7 @@ export function CalendarEventCard({
   const routine = item.kind === "routine" ? item.routine : null;
   const run = item.kind === "routine" ? item.run : null;
   const isRoomGoal = !isCall && (run?.target ?? routine?.target) === "room-goal";
-  const roomId = isRoomGoal ? run?.groupId ?? routine?.groupId : undefined;
+  const roomId = isRoomGoal ? (run ? run.groupId : routine?.groupId) : undefined;
   const room = roomId ? groups.find((candidate) => candidate.id === roomId) ?? { name: t("routines.group") } : undefined;
   const ownerIds = isCall ? item.call.botIds : [run?.botId ?? routine?.botId ?? ""];
   const ownerBots = ownerIds.flatMap((id) => bots.find((bot) => bot.id === id) ?? []);

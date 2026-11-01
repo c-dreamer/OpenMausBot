@@ -542,7 +542,7 @@ export function EventEditor({
     && (kind === "call"
       ? botIds.length > 0
       : routineTarget === "room-goal"
-        ? (!groupId || selectedRoom) && botIds[0] && roomMembers.some((bot) => bot.id === botIds[0])
+        ? (!groupId || state.groups.some((group) => group.id === groupId)) && botIds[0] && roomMembers.some((bot) => bot.id === botIds[0])
         : botIds.length > 0)
     && !intervalInvalid
     && !intervalDaysInvalid
@@ -923,7 +923,7 @@ export function EventEditor({
                   <div>
                     <label htmlFor="routine-goal-room" className="mb-2 block text-[13px] font-medium text-ink">{t("routines.editor.goalWhere")}</label>
                     <Select id="routine-goal-room" value={groupId} onChange={(event) => selectRoom(event.target.value)} className="w-full">
-                      {groupId && !selectedRoom && <option value={groupId} disabled>Room no longer exists. Choose another.</option>}<option value="">{t("routines.editor.goalOneOnOne")}</option>
+                      {groupId && !state.groups.some((group) => group.id === groupId) && <option value={groupId} disabled>Room no longer exists. Choose another.</option>}<option value="">{t("routines.editor.goalOneOnOne")}</option>
                       {rooms.map((room) => <option key={room.id} value={room.id}>{room.name}</option>)}
                     </Select>
                   </div>
