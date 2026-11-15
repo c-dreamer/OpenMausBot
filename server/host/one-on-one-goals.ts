@@ -133,6 +133,8 @@ export function createOneOnOneGoals(deps: OneOnOneGoalDeps) {
             // The chat looked free but the turn kept losing its slot; past the wait cap the run ends blocked, as a busy wait does.
             if (Date.now() + LOST_RACE_RETRY_MS >= deadline) return stayedBusy();
             await new Promise((resolve) => setTimeout(resolve, LOST_RACE_RETRY_MS));
+            // A timer can fire later than asked: past the cap, a free chat would let the retry start a turn.
+            if (Date.now() >= deadline) return stayedBusy();
             continue;
           }
           if (code === "spend_cap") {

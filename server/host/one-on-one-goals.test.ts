@@ -121,6 +121,28 @@ describe("a one-on-one goal whose turn keeps losing its slot", () => {
     expect(chat.finished).toEqual([{ status: "completed", detail: "Done." }]);
   });
 
+  it("ends blocked when a retry wakes past the cap and the chat is free by then", async () => {
+    vi.useFakeTimers();
+    let busy = false;
+    const chat = goalChat(async (call, lead, settle) => {
+      if (call === 1) { busy = true; throw refused("thread_busy"); }
+      lead.assistantItems.push(DONE);
+      settle({ ok: true, text: "" });
+    }, () => !busy);
+    // The first attempt loses its slot and reaches the retry delay.
+    await vi.advanceTimersByTimeAsync(0);
+    expect(chat.starts()).toBe(1);
+    // A late-delivered timer wakes the retry past the cap, where the chat is free again: the step must
+    // end blocked instead of starting a turn after the cap.
+    vi.setSystemTime(Date.now() + GROUP_GOAL_WAIT_MAX_MS);
+    busy = false;
+    await vi.advanceTimersByTimeAsync(GROUP_GOAL_WAIT_MAX_MS);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(chat.starts()).toBe(1);
+    expect(chat.run.turnCount).toBe(0);
+    expect(chat.finished).toEqual([{ status: "blocked", detail: expect.stringMatching(/^Solo stayed busy/) }]);
+  });
+
   it("retries one lost race and finishes on the done marker", async () => {
     vi.useFakeTimers();
     const chat = goalChat(async (call, lead, settle) => {
