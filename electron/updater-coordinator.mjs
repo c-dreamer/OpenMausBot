@@ -183,6 +183,8 @@ export function createUpdaterCoordinator(
     if (recoveryRequired || installOperation || (nativeStaging && (downloadOperation || nativeStagingStarted)) || (!manual && actionOwnsState && !(staged && !nativeStaging && !downloadOperation))) return Promise.resolve();
     if (checkOperation) {
       if (manual) checkOperation.manual = true;
+      // Joining an operation in flight emits no checking event, so a manual retry would look like it did nothing.
+      if (manual && !checkOperation.failed && checkOwnsState()) setState({ status: "checking" });
       return checkOperation.promise;
     }
 

@@ -2,7 +2,53 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { deferred, downloadInto, elevatedHarness, errorStates, found, harness, settle, SUM } from "./updater-test-fixture.mjs";
+import { QUIET_FAILURES_BEFORE_NOTICE } from "./updater-coordinator.mjs";
 import { installDetail } from "./update-words.mjs";
+
+test("a manual retry that joins an in-flight check shows that it is checking", async () => {
+  const { updater, coordinator, states, getState } = harness();
+  // Quiet failures put the notice up without owning the state, so a later check must keep it visible.
+  updater.checkForUpdates = () => Promise.reject(Object.assign(new Error("socket hang up"), { code: "ECONNRESET" }));
+  for (let attempt = 0; attempt < QUIET_FAILURES_BEFORE_NOTICE; attempt += 1) await coordinator.check();
+  assert.equal(getState().status, "error");
+
+  const inFlight = deferred();
+  updater.checkForUpdates = async () => {
+    updater.emit("checking-for-update");
+    return inFlight.promise;
+  };
+  const quiet = coordinator.check();
+  await settle();
+  assert.equal(getState().status, "error");
+
+  const joined = coordinator.check(true);
+  assert.equal(joined, quiet);
+  assert.equal(getState().status, "checking");
+  assert.equal(states.filter((entry) => entry.status === "checking").length, 1);
+
+  inFlight.resolve();
+  await quiet;
+});
+
+test("a manual retry that joins an already-failed check does not claim to be checking", async () => {
+  const { updater, coordinator, getState } = harness();
+  const inFlight = deferred();
+  updater.checkForUpdates = async () => {
+    updater.emit("checking-for-update");
+    return inFlight.promise;
+  };
+  const pending = coordinator.check();
+  await settle();
+  updater.emit("error", Object.assign(new Error("socket hang up"), { code: "ECONNRESET" }));
+  const afterFailure = getState().status;
+  assert.notEqual(afterFailure, "checking");
+
+  coordinator.check(true);
+  assert.equal(getState().status, afterFailure);
+
+  inFlight.resolve();
+  await pending;
+});
 
 test("elevated-install wording survives terminal handoff and its staged card", async () => {
   const { h } = elevatedHarness(async () => ({ ok: false, reason: "refused", ...installDetail("native.update.noAdmin") }));
