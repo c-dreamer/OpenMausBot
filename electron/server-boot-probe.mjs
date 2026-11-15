@@ -4,6 +4,17 @@ export const BOOT_PROBE_INTERVAL_MS = 500;
 
 export const SERVER_BOOT_TIMEOUT_MS = 60_000;
 export const SERVER_LISTENING_GRACE_MS = 180_000;
+
+/** OMB_SERVER_BOOT_TIMEOUT_MS raises the budget before the listening line for hosts whose first start
+ * after an update (compile cache cleared) is slower than the default; out-of-range values keep the
+ * default so a bad value cannot leave the wait unbounded. */
+export function serverBootTimeoutMs(env = {}) {
+  const raw = env.OMB_SERVER_BOOT_TIMEOUT_MS;
+  if (raw === undefined || raw === "") return SERVER_BOOT_TIMEOUT_MS;
+  const ms = Number(raw);
+  if (!Number.isFinite(ms)) return SERVER_BOOT_TIMEOUT_MS;
+  return Math.min(Math.max(Math.round(ms), 1_000), 600_000);
+}
 const LISTENING_LINE = "openmausbot server on ";
 
 export function listeningSignal() {

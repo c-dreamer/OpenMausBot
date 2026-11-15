@@ -57,7 +57,8 @@ export async function switchLocalEnvironment({ targetDir, targetId, port = DEFAU
     return await fail("start-failed");
   }
   if (!started || !Number.isInteger(started.pid)) {
-    log(`switch to ${targetDir} aborted: child did not start`);
+    // startChild only resolves once the child answered health, so a null here is "started, never ready".
+    log(`switch to ${targetDir} aborted: no server child became ready`);
     return await fail("start-failed");
   }
 

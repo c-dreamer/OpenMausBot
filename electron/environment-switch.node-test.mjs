@@ -271,3 +271,18 @@ test("revive does not retry a start that returned no child", async () => {
   assert.equal(await reviveAfterFailedSwitch(deps), false);
   assert.deepEqual(calls, ["start /data/previous"]);
 });
+
+test("a child that starts but never answers health is logged as not ready, not as one that did not start", async (t) => {
+  const { dir, cleanup } = realDir();
+  t.after(cleanup);
+  const logged = [];
+  const { calls, deps } = makeDeps({
+    startChild: () => null,
+    log: (message) => { logged.push(message); },
+  });
+  const result = await switchLocalEnvironment({ targetDir: dir, targetId: "env-8", deps });
+  assert.deepEqual(result, { ok: false, error: "start-failed", rolledBack: true });
+  assert.deepEqual(calls, ["stop", "release", "acquire", "rollback"]);
+  assert.match(logged.join("\n"), /no server child became ready/);
+  assert.doesNotMatch(logged.join("\n"), /did not start/);
+});

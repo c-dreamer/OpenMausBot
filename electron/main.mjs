@@ -25,7 +25,7 @@ import {
 import { migrateWorkspaceConfigFile, workspaceCredentialEnv } from "./workspace-credentials.mjs";
 import { evictStartupCacheOnce } from "./startup-cache-eviction.mjs";
 import { activateExistingWindow, releaseSingleInstanceLock } from "./single-instance.mjs";
-import { bootFailureMessage, listeningSignal, pollServerIdentity, SERVER_BOOT_TIMEOUT_MS, SERVER_LISTENING_GRACE_MS } from "./server-boot-probe.mjs";
+import { bootFailureMessage, listeningSignal, pollServerIdentity, serverBootTimeoutMs, SERVER_LISTENING_GRACE_MS } from "./server-boot-probe.mjs";
 import { createServerSupervisor } from "./server-supervisor.mjs";
 import { serverChildLaunch } from "./server-child-launch.mjs";
 import { packageUrlFromCommandLine, packageUrlFromDeepLink } from "./package-link.mjs";
@@ -1175,7 +1175,7 @@ async function startServerOn(port, dataDir = runningDataDir ?? startupEnvironmen
   const identity = await pollServerIdentity({
     port,
     pid: () => proc.pid,
-    bootTimeoutMs: SERVER_BOOT_TIMEOUT_MS,
+    bootTimeoutMs: serverBootTimeoutMs(process.env),
     isExited: () => exited || desktopShutdownStarted,
     isListening: listening.heard,
     listeningGraceMs: SERVER_LISTENING_GRACE_MS,

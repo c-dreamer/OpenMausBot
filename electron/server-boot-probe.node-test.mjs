@@ -8,6 +8,8 @@ import {
   bootFailureMessage,
   listeningSignal,
   pollServerIdentity,
+  SERVER_BOOT_TIMEOUT_MS,
+  serverBootTimeoutMs,
 } from "./server-boot-probe.mjs";
 
 const OUR_BODY = () => ({ app: "openmausbot", pid: 4242, static: true });
@@ -312,4 +314,21 @@ test("an answer in flight when the child starts listening gets the grace", async
     now: (() => { const t0 = Date.now(); return () => t0 + (Date.now() - t0) * 5; })(),
   });
   assert.equal(outcome.outcome, "ready");
+});
+
+test("no override keeps the default boot budget", () => {
+  assert.equal(serverBootTimeoutMs({}), SERVER_BOOT_TIMEOUT_MS);
+  assert.equal(serverBootTimeoutMs({ OMB_SERVER_BOOT_TIMEOUT_MS: "" }), SERVER_BOOT_TIMEOUT_MS);
+});
+
+test("an override raises the boot budget for a host slower than the default", () => {
+  assert.equal(serverBootTimeoutMs({ OMB_SERVER_BOOT_TIMEOUT_MS: "180000" }), 180_000);
+});
+
+test("a nonsense or out-of-range override still leaves a bounded wait", () => {
+  assert.equal(serverBootTimeoutMs({ OMB_SERVER_BOOT_TIMEOUT_MS: "soon" }), SERVER_BOOT_TIMEOUT_MS);
+  assert.equal(serverBootTimeoutMs({ OMB_SERVER_BOOT_TIMEOUT_MS: "180000ms" }), SERVER_BOOT_TIMEOUT_MS);
+  assert.equal(serverBootTimeoutMs({ OMB_SERVER_BOOT_TIMEOUT_MS: "1" }), 1_000);
+  assert.equal(serverBootTimeoutMs({ OMB_SERVER_BOOT_TIMEOUT_MS: "-5" }), 1_000);
+  assert.equal(serverBootTimeoutMs({ OMB_SERVER_BOOT_TIMEOUT_MS: "9999999" }), 600_000);
 });
